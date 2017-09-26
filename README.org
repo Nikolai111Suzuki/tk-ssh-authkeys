@@ -1,0 +1,20 @@
+** To disable any other authentication mechanisms:
+
+*** Disable authorized keys/password logins
+AuthorizedKeysFile=/dev/null
+PasswordAuthentication=no
+ChallengeResponseAuthentication=no
+UsePAM=no
+
+*** Enable trusted key checking
+AuthorizedKeysCommand=/usr/bin/tk-ssh-authkeys --type %t --key %k --user %u
+# Should be a user that _only_ does key checking and without login shell
+AuthorizedKeysCommandUser=tk-keys
+
+*** Disable use of non-trustedkey key types
+PubkeyAcceptedKeyTypes=ecdsa-sha2-nistp256
+
+*** Maybes
+**** Cache revocations to RevokedKeys to let openssh deny keys early??
+**** KexAlgorithms=ecdh-sha2-nistp256
+**** MACs=hmac-sha2-256
