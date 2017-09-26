@@ -1,3 +1,7 @@
+** TODO Recovery
+What makes me trust the "replaces" from keyInfo??
+I think we need some sort of signature from this call to _really_ trust it
+
 ** To disable any other authentication mechanisms:
 
 *** Disable authorized keys/password logins

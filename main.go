@@ -6,6 +6,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"log"
 	"os"
+	"os/user"
 	"reflect"
 )
 
@@ -15,16 +16,13 @@ func main() {
 	base64key := flag.String("key", "", "Base64 encoded public key (required)")
 	keyType := flag.String("type", "", "OpenSSH key type (required) (only ecdsa-sha2-nistp256 allowed)")
 	sshUser := flag.String("user", "", "Local user (required)")
-	// TODO: Make authkeps optional, could find homedir for user and check automatically
-	// TODO: Check ownership mode of authkeysfile
-	authkeysFile := flag.String("authkeys", "", "Which authorized keys file to read (required)")
+	authkeysFile := flag.String("authkeys", "", "Which authorized keys file to read (default ~/.ssh/authorized_keys)")
 	issuerURL := flag.String("issuer", "https://issuer.trustedkey.com", "Issuer URL to check key with")
-	// TODO: Check ownership mode of revokedkeysfile
 	revokedkeysFile := flag.String("revokedkeys", "", "Which file to cache revocations in")
 
 	flag.Parse()
 
-	if *base64key == "" || *keyType == "" || *sshUser == "" || *authkeysFile == "" {
+	if *base64key == "" || *keyType == "" || *sshUser == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -32,6 +30,15 @@ func main() {
 	if *keyType != "ecdsa-sha2-nistp256" {
 		stderr.Println("Key not ecdsa-sha2-nistp256")
 		os.Exit(1)
+	}
+
+	user, err := user.Lookup(*sshUser)
+	if err != nil {
+		panic(err)
+	}
+
+	if *authkeysFile == "" {
+		*authkeysFile = fmt.Sprintf("%s/.ssh/authorized_keys", user.HomeDir)
 	}
 
 	pubKey, pubAddr, err := Base64KeyToAddress([]byte(*base64key))

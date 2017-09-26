@@ -3,11 +3,22 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
+	"os"
 )
 
 func ParseAuthorizedKeysFile(filePath string) ([]ssh.PublicKey, error) {
+	statInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if statInfo.Mode() != 0600 {
+		return nil, fmt.Errorf("Bad file permissions for %s (%s)", statInfo.Mode(), filePath)
+	}
+
 	contents, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, err
