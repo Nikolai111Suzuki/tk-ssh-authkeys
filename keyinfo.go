@@ -8,16 +8,18 @@ import (
 	"net/url"
 )
 
+const NullAddress = "0x0000000000000000000000000000000000000000"
+
 type KeyInfo struct {
 	// timestamp int
-	revokedBy string
-	replaces  string
+	// revokedBy string
+	replaces string
 	// recovery string
 	revoked bool
 }
 
-func formatURL(baseURL string, address string) (string, error) {
-	url, err := url.Parse(baseURL)
+func formatURL(issuerURL string, address string) (string, error) {
+	url, err := url.Parse(issuerURL)
 	if err != nil {
 		return "", err
 	}
@@ -27,8 +29,8 @@ func formatURL(baseURL string, address string) (string, error) {
 	return url.String(), nil
 }
 
-func GetKeyInfo(baseURL string, address string) (*KeyInfo, error) {
-	requestURL, err := formatURL(baseURL, address)
+func GetKeyInfo(issuerURL string, address string) (*KeyInfo, error) {
+	requestURL, err := formatURL(issuerURL, address)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +59,7 @@ func GetKeyInfo(baseURL string, address string) (*KeyInfo, error) {
 	data = data["keyInfo"].(map[string]interface{})
 
 	return &KeyInfo{
-		revokedBy: data["revokedBy"].(string),
-		replaces:  data["replaces"].(string),
-		revoked:   data["isRevoked"].(bool),
+		replaces: data["replaces"].(string),
+		revoked:  data["revokedBy"].(string) != NullAddress,
 	}, nil
 }

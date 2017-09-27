@@ -1,0 +1,10 @@
+title SSH auth flow (with server side authkeys)
+
+SSH-client->SSH-Server: Login as user "jd" with keytype "ecdsa-sha2-nistp256" key "ssh-pubkey"
+SSH-Server->tk-ssh-authkeys: Relay login request information
+tk-ssh-authkeys->Blockchain: Check revocation/recovery
+Blockchain->tk-ssh-authkeys: Reply with key info (revocation/recovery)
+tk-ssh-authkeys->SSH-Server: Print authorized keys
+SSH-Server->SSH-client: Send nonce if key is authorized
+SSH-client->SSH-Server: Sign nonce with key
+SSH-Server->SSH-client: Open session

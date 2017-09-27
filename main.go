@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/user"
-	"reflect"
 )
 
 func main() {
@@ -41,18 +40,18 @@ func main() {
 		*authkeysFile = fmt.Sprintf("%s/.ssh/authorized_keys", user.HomeDir)
 	}
 
-	pubKey, pubAddr, err := Base64KeyToAddress([]byte(*base64key))
+	pub, err := Base64KeyToPublicKey([]byte(*base64key))
 	if err != nil {
 		panic(err)
 	}
 
-	authorizedKeys, err := ParseAuthorizedKeysFile(*authkeysFile)
+	authorizedKeys, err := AuthorizedKeysToPublicKey(*authkeysFile)
 	if err != nil {
 		panic(err)
 	}
 
 	// Get key info from issuer
-	keyInfo, err := GetKeyInfo(*issuerURL, pubAddr)
+	keyInfo, err := GetKeyInfo(*issuerURL, pub.addr)
 	if err != nil {
 		panic(err)
 	}
@@ -60,20 +59,53 @@ func main() {
 	// Handle revoked key
 	if keyInfo.revoked {
 		if *revokedkeysFile != "" {
-			err := CacheRevocation(*revokedkeysFile, pubKey)
+			err := CacheRevocation(*revokedkeysFile, pub.pub)
 			if err != nil {
 				stderr.Println(err)
 			}
 		}
-
-		stderr.Println(fmt.Sprintf("Key with address %s was revoked", pubAddr))
+		stderr.Println(fmt.Sprintf("Key with address %s was revoked", pub.addr))
 		os.Exit(1)
 	}
 
-	pubkeyBytes := []byte(pubKey.Marshal())
+	// Check exact match
 	for _, authKey := range authorizedKeys {
-		if reflect.DeepEqual(authKey.Marshal(), pubkeyBytes) {
-			fmt.Print(string(ssh.MarshalAuthorizedKey(authKey)))
+		if !pub.Equals(authKey) {
+			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.pub)))
+			os.Exit(0)
+		}
+
+	}
+
+	// Dont even try to check non-recovered key
+	if keyInfo.replaces == NullAddress {
+		os.Exit(1)
+	}
+
+	// Check for recovered keys matching local root keys
+	for _, authKey := range authorizedKeys {
+		if keyInfo.replaces == authKey.addr {
+			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.pub)))
+			os.Exit(0)
 		}
 	}
+
+	// Check recovered key
+	for _, authKey := range authorizedKeys {
+		authKeyInfo, err := GetKeyInfo(*issuerURL, authKey.addr)
+		if err != nil {
+			panic(err)
+		}
+
+		// Dont match 0x0 keys
+		if authKeyInfo.replaces == NullAddress {
+			continue
+		}
+
+		if authKeyInfo.replaces == keyInfo.replaces {
+			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.pub)))
+			os.Exit(0)
+		}
+	}
+
 }

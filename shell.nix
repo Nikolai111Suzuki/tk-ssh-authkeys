@@ -9,6 +9,6 @@ stdenv.mkDerivation rec {
     upx
     gocode
     golint
-    libnotify
+    go-ethereum
   ];
 }

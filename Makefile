@@ -13,7 +13,7 @@ build:
 	env CGO_ENABLED=0 GOPATH=$(GOPATH) go build -asmflags="-trimpath=$(BUILD_DIR)" -gcflags="-trimpath=$(BUILD_DIR)" -ldflags $(LDFLAGS) -o $(OUTBIN)
 
 compress:
-	upx $(OUTBIN)
+	upx --ultra-brute $(OUTBIN)
 
 clean:
 	rm -f $(OUTBIN)
