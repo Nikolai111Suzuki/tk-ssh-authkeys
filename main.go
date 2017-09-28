@@ -9,25 +9,50 @@ import (
 	"os/user"
 )
 
-func main() {
-	stderr := log.New(os.Stderr, "", 0)
+var StdErr = log.New(os.Stderr, "", 0)
 
+func main() {
 	base64key := flag.String("key", "", "Base64 encoded public key (required)")
 	keyType := flag.String("type", "", "OpenSSH key type (required) (only ecdsa-sha2-nistp256 allowed)")
 	sshUser := flag.String("user", "", "Local user (required)")
 	authkeysFile := flag.String("authkeys", "", "Which authorized keys file to read (default ~/.ssh/authorized_keys)")
-	issuerURL := flag.String("issuer", "https://issuer.trustedkey.com", "Issuer URL to check key with")
 	revokedkeysFile := flag.String("revokedkeys", "", "Which file to cache revocations in")
+
+	issuerURL := flag.String("issuer", "https://issuer.trustedkey.com", "Get key info with this issuer")
+
+	rpcURL := flag.String("rpc", "", "Get key info from blockchain directly over geth RPC")
+	contractAddr := flag.String("contract", "", "Contract address of RevokeList (required if -rpc is used)")
 
 	flag.Parse()
 
-	if *base64key == "" || *keyType == "" || *sshUser == "" {
+	if (*base64key == "" || *keyType == "" || *sshUser == "") ||
+		(*rpcURL != "" && *contractAddr == "") {
+
+		StdErr.Println(fmt.Sprintf("Usage of %s:", os.Args[0]))
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
+	// Abstraction for getting key information from issuer/geth
+	getKeyInfo := func(address string) (*KeyInfo, error) {
+		if *rpcURL != "" {
+			keyInfo, err := EthGetKeyInfo(*rpcURL, *contractAddr, address)
+			if err != nil {
+				return nil, err
+			}
+			return keyInfo, nil
+
+		}
+
+		keyInfo, err := IssuerGetKeyInfo(*issuerURL, address)
+		if err != nil {
+			return nil, err
+		}
+		return keyInfo, nil
+	}
+
 	if *keyType != "ecdsa-sha2-nistp256" {
-		stderr.Println("Key not ecdsa-sha2-nistp256")
+		StdErr.Println("Key not ecdsa-sha2-nistp256")
 		os.Exit(1)
 	}
 
@@ -51,59 +76,59 @@ func main() {
 	}
 
 	// Get key info from issuer
-	keyInfo, err := GetKeyInfo(*issuerURL, pub.addr)
+	keyInfo, err := getKeyInfo(pub.Addr)
 	if err != nil {
 		panic(err)
 	}
 
 	// Handle revoked key
-	if keyInfo.revoked {
+	if keyInfo.Revoked {
 		if *revokedkeysFile != "" {
-			err := CacheRevocation(*revokedkeysFile, pub.pub)
+			err := CacheRevocation(*revokedkeysFile, pub.Pub)
 			if err != nil {
-				stderr.Println(err)
+				StdErr.Println(err)
 			}
 		}
-		stderr.Println(fmt.Sprintf("Key with address %s was revoked", pub.addr))
+		StdErr.Println(fmt.Sprintf("Key with address %s was revoked", pub.Addr))
 		os.Exit(1)
 	}
 
 	// Check exact match
 	for _, authKey := range authorizedKeys {
-		if !pub.Equals(authKey) {
-			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.pub)))
+		if pub.Equals(authKey) {
+			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.Pub)))
 			os.Exit(0)
 		}
 
 	}
 
 	// Dont even try to check non-recovered key
-	if keyInfo.replaces == NullAddress {
-		os.Exit(1)
+	if keyInfo.Replaces == NullAddress {
+		panic("Key is not matching locally known keys and is not recovered")
 	}
 
 	// Check for recovered keys matching local root keys
 	for _, authKey := range authorizedKeys {
-		if keyInfo.replaces == authKey.addr {
-			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.pub)))
+		if keyInfo.Replaces == authKey.Addr {
+			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.Pub)))
 			os.Exit(0)
 		}
 	}
 
 	// Check recovered key
 	for _, authKey := range authorizedKeys {
-		authKeyInfo, err := GetKeyInfo(*issuerURL, authKey.addr)
+		authKeyInfo, err := getKeyInfo(authKey.Addr)
 		if err != nil {
 			panic(err)
 		}
 
 		// Dont match 0x0 keys
-		if authKeyInfo.replaces == NullAddress {
+		if authKeyInfo.Replaces == NullAddress {
 			continue
 		}
 
-		if authKeyInfo.replaces == keyInfo.replaces {
-			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.pub)))
+		if authKeyInfo.Replaces == keyInfo.Replaces {
+			fmt.Print(string(ssh.MarshalAuthorizedKey(pub.Pub)))
 			os.Exit(0)
 		}
 	}

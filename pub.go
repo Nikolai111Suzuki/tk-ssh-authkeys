@@ -14,12 +14,12 @@ import (
 )
 
 type PublicKey struct {
-	pub  ssh.PublicKey
-	addr string
+	Pub  ssh.PublicKey
+	Addr string
 }
 
 func (p *PublicKey) Equals(pub *PublicKey) bool {
-	return p.addr == pub.addr
+	return p.Addr == pub.Addr
 }
 
 func Base64KeyToPublicKey(in []byte) (*PublicKey, error) {
@@ -57,8 +57,8 @@ func Base64KeyToPublicKey(in []byte) (*PublicKey, error) {
 	}
 
 	return &PublicKey{
-		pub:  pub,
-		addr: addr,
+		Pub:  pub,
+		Addr: addr,
 	}, nil
 }
 
@@ -98,7 +98,8 @@ func AuthorizedKeysToPublicKey(filePath string) ([]*PublicKey, error) {
 
 		key, err := Base64KeyToPublicKey(keyLine[1])
 		if err != nil {
-			return nil, err
+			StdErr.Println(err)
+			continue
 		}
 
 		keys = append(keys, key)
