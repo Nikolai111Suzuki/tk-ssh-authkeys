@@ -6,22 +6,23 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
-func formatURL(issuerURL string, address string) (string, error) {
+func formatURL(issuerURL string, pubAddrs []string) (string, error) {
 	url, err := url.Parse(issuerURL)
 	if err != nil {
 		return "", err
 	}
 	url.Path = "keyInfo"
-	url.RawQuery = fmt.Sprintf("address=%s", address)
+	url.RawQuery = fmt.Sprintf("address=%s", strings.Join(pubAddrs, ","))
 
 	return url.String(), nil
 }
 
 // IssuerGetKeyInfo - Get key info from issuer API
-func IssuerGetKeyInfo(issuerURL string, address string) (*KeyInfo, error) {
-	requestURL, err := formatURL(issuerURL, address)
+func IssuerGetKeyInfo(issuerURL string, pubAddrs []string) ([]*KeyInfo, error) {
+	requestURL, err := formatURL(issuerURL, pubAddrs)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +46,13 @@ func IssuerGetKeyInfo(issuerURL string, address string) (*KeyInfo, error) {
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
 	}
-
 	data = data["data"].(map[string]interface{})
-	data = data["keyInfo"].(map[string]interface{})
 
-	keyInfo := NewKeyInfo(data["replaces"].(string), data["revokedBy"].(string))
+	keys := []*KeyInfo{}
+	for _, pubAddr := range pubAddrs {
+		keyInfo := data[pubAddr].(map[string]interface{})
+		keys = append(keys, NewKeyInfo(keyInfo["replaces"].(string), keyInfo["revokedBy"].(string)))
+	}
 
-	return keyInfo, nil
+	return keys, nil
 }

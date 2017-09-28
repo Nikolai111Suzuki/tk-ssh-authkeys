@@ -13,15 +13,18 @@ import (
 	"reflect"
 )
 
+// PublicKey - Encapsulate a ssh.PublicKey and a blockchain address
 type PublicKey struct {
 	Pub  ssh.PublicKey
 	Addr string
 }
 
+// Equals - Compare two public keys
 func (p *PublicKey) Equals(pub *PublicKey) bool {
 	return p.Addr == pub.Addr
 }
 
+// Base64KeyToPublicKey - Convert base64 encoded SSH pubkey to PublicKey
 func Base64KeyToPublicKey(in []byte) (*PublicKey, error) {
 	in = bytes.TrimSpace(in)
 
@@ -62,6 +65,7 @@ func Base64KeyToPublicKey(in []byte) (*PublicKey, error) {
 	}, nil
 }
 
+// AuthorizedKeysToPublicKey - Parse authorized keys file
 func AuthorizedKeysToPublicKey(filePath string) ([]*PublicKey, error) {
 	statInfo, err := os.Stat(filePath)
 	if err != nil {

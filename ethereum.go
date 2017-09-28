@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -25,27 +24,46 @@ func ethSha3(input []byte) string {
 }
 
 // EthGetKeyInfo - Get key info from blockchain node
-func EthGetKeyInfo(ethURL string, contractAddr string, pubAddr string) (*KeyInfo, error) {
+func EthGetKeyInfo(ethURL string, contractAddr string, pubAddrs []string) ([]*KeyInfo, error) {
 	ethClient, err := rpc.Dial(ethURL)
 	if err != nil {
 		return nil, err
 	}
 
-	param := make(map[string]string)
-	param["to"] = contractAddr
-	param["data"] = fmt.Sprintf("0x%s000000000000000000000000%s", keyInfoAddr[:8], pubAddr[2:])
-
-	result := ""
-	ethClient.Call(&result, "eth_call", param, "latest")
-	if len(result) == 0 {
-		return nil, errors.New("Result from geth RPC empty, is RPC running?")
+	batch := []rpc.BatchElem{}
+	for _, pubAddr := range pubAddrs {
+		batch = append(batch, rpc.BatchElem{
+			Method: "eth_call",
+			Args: []interface{}{
+				map[string]string{
+					"to":   contractAddr,
+					"data": fmt.Sprintf("0x%s000000000000000000000000%s", keyInfoAddr[:8], pubAddr[2:]),
+				},
+				"latest",
+			},
+			Result: new(string),
+		})
 	}
 
-	// Using fixed offsets is quite crude but at least we can avoid
-	// using the cgo dependent code that abigen outputs
-	result = reverseString(result[2:])
-	replaces := fmt.Sprintf("0x%s", reverseString(result[:40]))
-	revokedBy := fmt.Sprintf("0x%s", reverseString(result[64:64+40]))
+	if err := ethClient.BatchCall(batch); err != nil {
+		return nil, err
+	}
 
-	return NewKeyInfo(replaces, revokedBy), nil
+	keys := []*KeyInfo{}
+	for _, b := range batch {
+		if b.Error != nil {
+			return nil, err
+		}
+
+		result := *b.Result.(*string)
+		result = reverseString(result[2:])
+		// Using fixed offsets is quite crude but at least we can avoid
+		// using the cgo dependent code that abigen outputs
+		replaces := fmt.Sprintf("0x%s", reverseString(result[:40]))
+		revokedBy := fmt.Sprintf("0x%s", reverseString(result[64:64+40]))
+
+		keys = append(keys, NewKeyInfo(replaces, revokedBy))
+	}
+
+	return keys, nil
 }

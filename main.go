@@ -9,6 +9,7 @@ import (
 	"os/user"
 )
 
+// StdErr ...
 var StdErr = log.New(os.Stderr, "", 0)
 
 func main() {
@@ -33,24 +34,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Abstraction for getting key information from issuer/geth
-	getKeyInfo := func(address string) (*KeyInfo, error) {
-		if *rpcURL != "" {
-			keyInfo, err := EthGetKeyInfo(*rpcURL, *contractAddr, address)
-			if err != nil {
-				return nil, err
-			}
-			return keyInfo, nil
-
-		}
-
-		keyInfo, err := IssuerGetKeyInfo(*issuerURL, address)
-		if err != nil {
-			return nil, err
-		}
-		return keyInfo, nil
-	}
-
 	if *keyType != "ecdsa-sha2-nistp256" {
 		StdErr.Println("Key not ecdsa-sha2-nistp256")
 		os.Exit(1)
@@ -65,6 +48,34 @@ func main() {
 		*authkeysFile = fmt.Sprintf("%s/.ssh/authorized_keys", user.HomeDir)
 	}
 
+	// Abstraction for getting key information from issuer/geth
+	getKeyInfo := func(keys []*PublicKey) (map[string]*KeyInfo, error) {
+		pubAddrs := []string{}
+		for _, key := range keys {
+			pubAddrs = append(pubAddrs, key.Addr)
+		}
+
+		var keyInfo []*KeyInfo
+		if *rpcURL != "" {
+			keyInfo, err = EthGetKeyInfo(*rpcURL, *contractAddr, pubAddrs)
+			if err != nil {
+				return nil, err
+			}
+
+		} else {
+			keyInfo, err = IssuerGetKeyInfo(*issuerURL, pubAddrs)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		ret := make(map[string]*KeyInfo)
+		for idx, pubAddr := range pubAddrs {
+			ret[pubAddr] = keyInfo[idx]
+		}
+		return ret, nil
+	}
+
 	pub, err := Base64KeyToPublicKey([]byte(*base64key))
 	if err != nil {
 		panic(err)
@@ -75,13 +86,12 @@ func main() {
 		panic(err)
 	}
 
-	// Get key info from issuer
-	keyInfo, err := getKeyInfo(pub.Addr)
+	allKeyInfo, err := getKeyInfo(append(authorizedKeys, []*PublicKey{pub}...))
 	if err != nil {
 		panic(err)
 	}
 
-	// Handle revoked key
+	keyInfo := allKeyInfo[pub.Addr]
 	if keyInfo.Revoked {
 		if *revokedkeysFile != "" {
 			err := CacheRevocation(*revokedkeysFile, pub.Pub)
@@ -117,13 +127,11 @@ func main() {
 
 	// Check recovered key
 	for _, authKey := range authorizedKeys {
-		authKeyInfo, err := getKeyInfo(authKey.Addr)
-		if err != nil {
-			panic(err)
-		}
+		authKeyInfo := allKeyInfo[authKey.Addr]
 
 		// Dont match 0x0 keys
-		if authKeyInfo.Replaces == NullAddress {
+		if authKeyInfo.Revoked || authKeyInfo.Replaces == NullAddress {
+			StdErr.Println(fmt.Sprintf("Key with address %s was revoked", authKey.Addr))
 			continue
 		}
 
