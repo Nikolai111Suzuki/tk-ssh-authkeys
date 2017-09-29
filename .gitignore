@@ -1,0 +1,4 @@
+/pkg
+/tk-ssh-authkeys
+*.deb
+*.rpm

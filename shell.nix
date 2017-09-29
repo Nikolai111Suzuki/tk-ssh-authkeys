@@ -10,5 +10,10 @@ stdenv.mkDerivation rec {
     gocode
     golint
     go-ethereum
-  ];
+  ]  ++ (if stdenv.isLinux then [
+    # Packaging tools
+    python3
+    fpm
+    rpm
+  ] else []);
 }
