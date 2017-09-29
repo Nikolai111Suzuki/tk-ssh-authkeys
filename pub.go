@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
@@ -67,18 +68,39 @@ func Base64KeyToPublicKey(in []byte) (*PublicKey, error) {
 
 // AuthorizedKeysToPublicKey - Parse authorized keys file
 func AuthorizedKeysToPublicKey(filePath string) ([]*PublicKey, error) {
-	statInfo, err := os.Stat(filePath)
-	if err != nil {
-		return nil, err
-	}
 
-	if statInfo.Mode() != 0600 {
-		return nil, fmt.Errorf("Bad file permissions for %s (%s)", statInfo.Mode(), filePath)
-	}
+	var contents []byte
+	var err error
 
-	contents, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return nil, err
+	if filePath == "-" {
+		stat, err := os.Stdin.Stat()
+		if err != nil {
+			return nil, err
+		}
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			return nil, errors.New("No data being piped to stdin")
+		}
+
+		contents, err = ioutil.ReadAll(bufio.NewReader(os.Stdin))
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		contents, err = ioutil.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		statInfo, err := os.Stat(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		if statInfo.Mode() != 0600 {
+			return nil, fmt.Errorf("Bad file permissions for %s (%s)", statInfo.Mode(), filePath)
+		}
+
 	}
 
 	keys := []*PublicKey{}
