@@ -1,4 +1,6 @@
 * Trusted Key SSH authkeys
+[[https://travis-ci.org/trustedkey/tk-ssh-authkeys][https://travis-ci.org/trustedkey/tk-ssh-authkeys.svg?branch=master]]
+
 SSH key management utilizing the [[https://trustedkey.com/][Trusted Key app]] and the [[https://ethereum.org/][Ethereum block chain]]
 
 ** Installation
