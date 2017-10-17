@@ -6,8 +6,8 @@ OUTBIN="tk-ssh-authkeys"
 PKG_NAME="tk-ssh-authkeys"
 PKG_MAINTAINER="adam@trustedkey.com"
 PKG_DESCRIPTION="Trusted Key SSH server authorized keys"
-PKG_LICENSE="Unknown"
-PKG_VERSION=`cat VERSION`
+PKG_LICENSE="GPL3"
+PKG_VERSION=`git describe --tags --abbrev=0`
 
 all: build
 
