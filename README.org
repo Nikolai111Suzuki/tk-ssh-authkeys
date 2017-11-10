@@ -3,6 +3,12 @@
 
 SSH key management utilizing the [[https://trustedkey.com/][Trusted Key app]] and the [[https://ethereum.org/][Ethereum block chain]]
 
+Trusted Key Authkeys is an optional tool for installation on a server managed by the Trusted Key Secure SSH Key.
+
+When a user gets a new phone and recovers their Trusted Key App the associated SSH key will change.
+
+This tool leverages the Trusted Key (ethereum based) blockchain to check for revocations and establish equivalence between the old and the new recovered key, eliminating the need to deploy new keys.
+
 ** Installation
 
 *** Debian/Ubuntu
